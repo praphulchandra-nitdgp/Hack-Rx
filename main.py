@@ -8,17 +8,13 @@ from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# --- Setup Directories ---
 UPLOAD_DIR = "uploaded_pdfs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# --- Initialize FastAPI App ---
 app = FastAPI()
 
-# --- Enable CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,36 +23,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Load Embedding Model ---
 print("🔍 Loading sentence-transformer embedding model...")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 print("✅ Embedding model loaded.")
 
-# --- Get API key from environment variables ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-
-# --- Initialize Groq/OpenAI Client ---
 client = OpenAI(
     api_key=GROQ_API_KEY,
     base_url="https://api.groq.com/openai/v1",
 )
-MODEL_NAME = "llama3-8b-8192"  # ✅ Supported Groq model
+MODEL_NAME = "llama3-8b-8192"
 
-# --- In-memory stores ---
 doc_store = {}
 embedding_store = {}
 
-# --- Fallback sentence splitter ---
 def fallback_sent_tokenize(text):
     return re.split(r'(?<=[.!?])\s+', text.strip())
 
-# --- Request schema ---
 class QueryRequest(BaseModel):
     documents: str
     questions: List[str]
 
-# --- Query Groq LLM ---
 def query_groq_llm(context: str, question: str) -> str:
     try:
         prompt = (
@@ -74,17 +62,14 @@ def query_groq_llm(context: str, question: str) -> str:
             max_tokens=200,
             temperature=0.3,
         )
-
         return response.choices[0].message.content.strip()
 
     except Exception as e:
         return f"Error getting response from LLM: {e}"
 
-# --- Main endpoint ---
 @app.post("/hackrx/run")
 async def hackrx_run(request: QueryRequest):
     try:
-        # Step 1: Download PDF
         pdf_url = request.documents
         pdf_bytes = requests.get(pdf_url).content
         doc_id = str(uuid.uuid4())
@@ -92,7 +77,6 @@ async def hackrx_run(request: QueryRequest):
         with open(file_path, "wb") as f:
             f.write(pdf_bytes)
 
-        # Step 2: Extract and chunk PDF
         all_sentences = []
         with fitz.open(file_path) as doc:
             for page in doc:
@@ -104,7 +88,6 @@ async def hackrx_run(request: QueryRequest):
         if not all_sentences:
             return {"error": "No extractable text found in PDF."}
 
-        # Step 3: Embed and index
         doc_store[doc_id] = all_sentences
         embeddings = embedder.encode(all_sentences)
         dim = embeddings.shape[1]
@@ -112,7 +95,6 @@ async def hackrx_run(request: QueryRequest):
         index.add(np.array(embeddings))
         embedding_store[doc_id] = {"index": index, "texts": all_sentences}
 
-        # Step 4: Answer questions
         answers = []
         for question in request.questions:
             question_embedding = embedder.encode([question])[0]
@@ -135,3 +117,9 @@ async def hackrx_run(request: QueryRequest):
             "details": str(e),
             "trace": traceback.format_exc()
         }
+
+# === ENTRYPOINT FOR RAILWAY OR LOCAL ===
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))  # Railway uses PORT env var
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
