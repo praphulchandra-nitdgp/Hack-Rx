@@ -24,7 +24,7 @@ app.add_middleware(
 )
 
 print("🔍 Loading sentence-transformer embedding model...")
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+embedder = SentenceTransformer("paraphrase-MiniLM-L3-v2")
 print("✅ Embedding model loaded.")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
