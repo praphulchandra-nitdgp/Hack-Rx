@@ -34,10 +34,7 @@ print("✅ Embedding model loaded.")
 
 # --- Get API key from environment variables ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    # Fallback for development - REMOVE THIS IN PRODUCTION
-    GROQ_API_KEY = "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"
-    print("⚠️  WARNING: Using hardcoded API key. Set GROQ_API_KEY environment variable for production.")
+
 
 # --- Initialize Groq/OpenAI Client ---
 client = OpenAI(
